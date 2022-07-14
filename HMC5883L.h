@@ -23,24 +23,16 @@
 extern "C" {
 #endif
 
+
+
 #include "main.h"
-#include "I2C_Master/MyI2C.h"
+#include "I2C/MyI2C.h"
 #include "HMC5883L_Register.h"
-/* состояние процесса обмена данными с устройством как с отдельным элементом сети
- * 	применяется для отображения состояния процесса работы с устройством для главного кода
- */
-typedef enum HMC5883L_status_t {//состояние устройства
-	HMC_Init,		//устройство не настроено
-	HMC_OK,		//устройство готово к опросу
-	HMC_Faulth	//устройство неисправно
-} HMC5883L_status;
 
-/*	состояние обмена данными с устройством, использовать для завершения функции работы с устройством */
-typedef enum HMC5883L_Connect_Status_t {
-	HMC_Processing, //выполняется работа с устройством: обмен данными, обработка результатов
-	HMC_Complite	//работа с устройством завершена, данные считаны/записаны корректно
-} HMC5883L_Connect_Status;
 
+enum HMC5883L_ADDRESS {
+	HMC5883L_ADDR = 0x3C
+};
 typedef struct HMC5883L_raw_data_t {
 	uint16_t X;
 	uint16_t Y;
@@ -58,15 +50,14 @@ typedef struct HMC5883L_data_t {
 typedef struct HMC5883L_dev_t {
 	const uint8_t addr;
 	uint8_t step;
-	HMC5883L_status status;
+	Device_status_t status;
 	HMC5883L_raw_data raw;
 	HMC5883L_data data;
 } HMC5883L_dev;
 
 //INITIALIZATION	================================================================
-HMC5883L_Connect_Status HMC5883L_Init(I2C_Connection *_i2c, HMC5883L_dev *dev, uint8_t *pbuffer);
-HMC5883L_Connect_Status HMC5883L_GetData(I2C_Connection *_i2c, HMC5883L_dev *dev, uint8_t *pbuffer);
-
+uint8_t HMC5883L_Init(I2C_Connection *_i2c, HMC5883L_dev *dev);
+uint8_t HMC5883L_GetData(I2C_Connection *_i2c, HMC5883L_dev *dev);
 
 #ifdef __cplusplus
 }

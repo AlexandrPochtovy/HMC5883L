@@ -18,64 +18,65 @@
  */
 #include "HMC5883L.h"
 
-static const uint8_t HMC5883L_DEFAULT_ADDRESS = 0x3C;
-static const uint32_t HMC5883L_CHIP_ID = 0x00483433; //< Assumes ALT address pin low
+#define HMC5883L_CHIP_ID (uint32_t)0x00483433 //< Assumes ALT address pin low
 
-HMC5883L_Connect_Status HMC5883L_Init(I2C_Connection *_i2c, HMC5883L_dev *dev, uint8_t *pbuffer) {
-	if (_i2c->i2cStatus == I2C_Bus_Free) {//send setup
-		dev->status = HMC_Init;
-        switch (dev->step) {
-		case 0://setup sensor
+static inline CONCAT_BYTES(uint8_t msb, uint8_t lsb) {
+    return (uint16_t)(((uint16_t)msb << 8) | (uint16_t)lsb);
+}	
+
+uint8_t HMC5883L_Init(I2C_Connection *_i2c, HMC5883L_dev *dev) {
+	if (_i2c->status == PORT_FREE)	{ //send setup
+		dev->status = INIT;
+		switch (dev->step) {
+		case 0: {//setup sensor
 			_i2c->addr = dev->addr;
-			_i2c->rxtxp = pbuffer;
 			_i2c->reg = HMC5883L_REG_CONFIG_A;
 			_i2c->len = 3;
 			_i2c->mode = I2C_MODE_WRITE;
-            _i2c->rxtxp[0] = HMC5883L_SAMPLES_1 | HMC5883L_DATARATE_15HZ | HMC5883L_NORMAL;
-            _i2c->rxtxp[1] = HMC5883L_GAIN_1_3GA;
-            _i2c->rxtxp[2] = HMC5883L_CONTINOUS;
+			uint8_t dt[3];
+			dt[0] = HMC5883L_SAMPLES_1 | HMC5883L_DATARATE_15HZ | HMC5883L_NORMAL;
+			dt[1] = HMC5883L_GAIN_1_3GA;
+			dt[2] = HMC5883L_CONTINOUS;
+			PutMulti(&_i2c->buffer, dt, 3);
 			dev->step = 1;
-			break;
-
+			break; }
 		case 1:
-			dev->status = HMC_OK;
-            dev->step = 0;
-			return HMC_Complite;
-			break;
+			dev->status = OK;
+			dev->step = 0;
+			return 1;
 		default:
 			dev->step = 0;
-            break;
+			break;
 		}
-        I2C_Start_IRQ(_i2c);
+		I2C_Start_IRQ(_i2c);
 	}
-	return HMC_Processing;
+	return 0;
 }
 
-HMC5883L_Connect_Status HMC5883L_GetData(I2C_Connection *_i2c, HMC5883L_dev *dev, uint8_t *pbuffer) {
-	if (_i2c->i2cStatus == I2C_Bus_Free) {
-		_i2c->rxtxp = pbuffer;
-        switch (dev->step) {
-		case 0://read data
+uint8_t HMC5883L_GetData(I2C_Connection *_i2c, HMC5883L_dev *dev) {
+	if (_i2c->status == PORT_FREE) {
+		switch (dev->step) {
+		case 0: //read data
 			_i2c->addr = dev->addr;
 			_i2c->reg = HMC5883L_REG_OUT_X_M;
 			_i2c->len = 6;
 			_i2c->mode = I2C_MODE_READ;
 			dev->step = 1;
 			break;
-
-		case 1://calculate data
-			dev->raw.X = (_i2c->rxtxp[0]<<8) | _i2c->rxtxp[1];
-			dev->raw.Z = (_i2c->rxtxp[2]<<8) | _i2c->rxtxp[3];
-			dev->raw.Y = (_i2c->rxtxp[4]<<8) | _i2c->rxtxp[5];
-			dev->status = HMC_OK;
-            dev->step = 0;
-			return HMC_Complite;
-			break;
+		case 1: {//calculate data
+			uint8_t dt[6];
+			GetMulti(&_i2c->buffer, dt, 6);
+			dev->raw.X = (uint16_t)CONCAT_BYTES(dt[0], dt[1]);
+			dev->raw.Z = (uint16_t)CONCAT_BYTES(dt[2], dt[3]);
+			dev->raw.Y = (uint16_t)CONCAT_BYTES(dt[4], dt[5]);
+			dev->status = OK;
+			dev->step = 0;
+			return 1; }
 		default:
 			dev->step = 0;
-            break;
+			break;
 		}
-        I2C_Start_IRQ(_i2c);
+		I2C_Start_IRQ(_i2c);
 	}
-	return HMC_Processing;
+	return 0;
 }
